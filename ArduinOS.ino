@@ -1,92 +1,123 @@
+#include "EEPROM.h"
 #include "instruction_set.h"
 
 #define BUFSIZE 12
+static char commandBuffer[BUFSIZE];
 
-#define STOPPED 0
-#define RUNNING 1
-// #define BUSY 2
-// #define FINISHED 3
-// #define WAITING 4
-
-
-typedef struct process{
-    // uint8_t id;
-    String name;
-    uint8_t status;
-    // uint8_t waitForID;
-};
-
-process processes[] = {
-    {"CommandLine", STOPPED},
-    {"Run", RUNNING}
-};
 
 
 // -----------------------------------------------------------------------
-static char commandBuffer[BUFSIZE];
+#define FILENAMESIZE 12
+#define FATSIZE 10
+#define FATENTRYSIZE 16
+#define FATSTART 1
 
-typedef struct commandType{
-    char name[BUFSIZE];
-    void (*func)();
+typedef struct FATEntry{
+    char name[FILENAMESIZE];
+    uint16_t size;
+    uint16_t address;
 };
 
-void store();
-void retrieve();
-
-// Command name and reference to the function
-static commandType command[] = {
-    {"store", &store},
-    {"retrieve", &retrieve}
+class FATClass{
+    private:
+        FATEntry FAT[FATSIZE];
+    public: 
+        FATEntry operator [] (int i) const{
+            EEPROM.get(FATSTART + FATENTRYSIZE*i, FAT[i]);
+            return FAT[i];
+        }
 };
-static const uint8_t NoOfCommands = sizeof(command) / sizeof(commandType);
-//------------------------------------------------------------------------
+static EERef noOfFiles = EEPROM[0];
+static FATClass FAT;
+// -----------------------------------------------------------------------
 
 
 
 void setup(){
     Serial.begin(9600);
-    
 }
 
 void loop(){
-    // for(const process& p : processes){
-    //     if(p.status == RUNNING)
-    // }
-    run();
-    delayMicroseconds(100);
+    executeCommand();
+    delayMicroseconds(65500);
+}
+
+void doWhileWaiting(){
+    delay(1);
 }
 
 
+
+// -----------------------------------------------------------------------
+
+
+
+
+
+
+
+
+
+
+
 void store(){
-    // if(readCommand(commandBuffer)){
-    //     Serial.println("Store function");
-    //     Serial.println(commandBuffer);
-    // }
-    Serial.println("Store");
+    Serial.print("File name: ");
+    while(!readCommand(commandBuffer)) doWhileWaiting();
+    Serial.println(commandBuffer);
+
+    Serial.print("File size: ");
+    while(!readCommand(commandBuffer)) doWhileWaiting();
+    Serial.println(commandBuffer);
+
+
+    clearBuffer();
 }
 
 void retrieve(){
     Serial.println("Retrieve function");
+    Serial.println(EEPROM.length());
+    uint8_t size = sizeof(FATEntry);
+    Serial.println(size);
+    // // FATEntry file = {"hoi", 69, 420};
+    // // EEPROM.put(1, file);
+    Serial.print(FAT[0].name);
+    Serial.print(FAT[0].size);
+    Serial.println(FAT[0].address);
+    clearBuffer();
 }
 
 
 
-bool run(){
+
+
+
+
+
+
+
+
+// -----------------------------------------------------------------------
+// Command name and reference to the function
+typedef struct commandType{
+    char name[BUFSIZE];
+    void (*func)();
+};
+
+static commandType command[] = {
+    {"store", &store},
+    {"retrieve", &retrieve}
+};
+static const uint8_t NoOfCommands = sizeof(command) / sizeof(commandType);
+
+
+bool executeCommand(){
 
     if(readCommand(commandBuffer)) {
 
-        // for(const commandType& c : command){
-        //     if(strcmp(c.name, commandBuffer) == 0) {
-        //         commandBuffer[0] = '\0';        // "erases" the buffer
-        //         c.func();
-                
-        //         return true; 
-        //     }
-        // }
-        for(int i = 0; i < NoOfCommands; i++){
-            if(strcmp(command[i].name, commandBuffer) == 0) {
+        for(const commandType c : command){
+            if(strcmp(c.name, commandBuffer) == 0) {
                 commandBuffer[0] = '\0';        // "erases" the buffer
-                command[i].func();
+                c.func();
                 
                 return true; 
             }
@@ -95,14 +126,17 @@ bool run(){
         Serial.print("Error: no command \"");
         Serial.print(commandBuffer);
         Serial.println('"');
-        commandBuffer[0] = '\0';        // "erases" the buffer 
 
-        // Clears the serial buffer to get rid of any arguments appended to the command
-        delay(2);
-        while(Serial.available() > 0) {
-            Serial.read();
-            delay(2);
+        Serial.println("-------------------------------------------");
+        Serial.println("Available commands:");
+        for(const commandType c : command){
+            Serial.println(c.name);
         }
+        Serial.println("-------------------------------------------");
+
+
+        // Get rid of any arguments appended to the command
+        clearBuffer();
 
         return true; 
         
@@ -111,35 +145,39 @@ bool run(){
     return false;
 }
 
+// Reads a single character from de serial buffer and places it in commandBuffer, returns true if command is complete
 bool readCommand(char* buffer){
-
-    // 32 space
-    // 10 Line Finished
+    char* c = buffer + strlen(buffer);
     
-    if(Serial.available()){
-        const char receivedCharacter = Serial.read();
-        
-        // if the buffer is empty and the received character is a space or LF, it gets ignored
-        if(strlen(buffer) == 0 && (receivedCharacter == 32 || receivedCharacter == 10)) return false;
+    while(Serial.available()){
 
-        if(receivedCharacter == 32 || receivedCharacter == 10) {
-            strcat(buffer, '\0');
+        *c = Serial.read();
+
+        // if the buffer is empty and the received character is a space, Line Finished or Cariiage Return, it gets ignored
+        if(strlen(buffer) == 0 && (*c == ' ' || *c == '\n' || *c == '\r')) return false;
+
+        // If space, LF or CR, finish command with null terminator
+        if(*c == ' ' || *c == '\n' || *c == '\r') {
+            *c = '\0';
             return true;
         }
-        else{
-            strcat(buffer, &receivedCharacter);
-        }  
+        
+        ++c;
+        *c = '\0';
 
-        // if the buffer lenght is 11 or higher, the 12th char will be made the terminating character
-        // and the serial buffer will be looped through till the first space or LF
-        if(strlen(buffer) >= BUFSIZE-1){
-            buffer[BUFSIZE-1] = '\0';
+        // Max length reached
+        if(c == buffer + BUFSIZE - 1) return true;
 
-            char nextCharacter = '\0';
-            while(nextCharacter != 32 && nextCharacter != 10) nextCharacter = Serial.read();
-
-            return true;
-        }   
     }
     return false;
+}
+
+void clearBuffer(){
+    commandBuffer[0] = '\0';        // "erases" the commandBuffer 
+
+    delay(2);
+    while(Serial.available()) {
+        Serial.read();
+        delay(2);
+    }
 }
