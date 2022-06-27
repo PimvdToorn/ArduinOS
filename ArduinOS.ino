@@ -13,6 +13,14 @@ const char SEPARATOR[] = "------------------------------------------------------
 
 int16_t checkErrorCode(int16_t code){
     switch (code){
+    case 1:
+        // Success!
+        break;
+
+    case 0:
+        Serial.println(F("General exception"));
+        break;
+
     case NOTFOUND:
         Serial.println(F("Not found"));
         break;
@@ -41,7 +49,13 @@ int16_t checkErrorCode(int16_t code){
         Serial.println(F("Variable table full exception"));
         break;
 
+    case UNKNOWNINSTRUCTION:
+        Serial.println(F("Unknown instruction exception"));
+        break;
+
     default:
+        Serial.print(F("Unknown exception: "));
+        Serial.println(code);
         break;
     }
 
@@ -77,6 +91,10 @@ static uint8_t nVariables = 0;
 static MemoryClass mem(memory, varTable, &nVariables, &memSize, &varTableSize, procTable);
 
 
+#include "processExecution.hpp"
+
+static processExecution pE(procTable, &mem);
+
 
 // -----------------------------------------------------------------------
 
@@ -84,20 +102,22 @@ void setup(){
     Serial.begin(9600);
 
     checkErrorCode(pT.addProcess("blink"));
-    checkErrorCode(pT.addProcess("blink"));
-    checkErrorCode(pT.addProcess("blink"));
-    checkErrorCode(pT.addProcess("blink"));
-    checkErrorCode(pT.addProcess("blink"));
-    checkErrorCode(pT.addProcess("blink"));
-    checkErrorCode(pT.addProcess("blink"));
-    checkErrorCode(pT.addProcess("blink"));
-    checkErrorCode(pT.addProcess("blink"));
-    checkErrorCode(pT.addProcess("blink"));
+    // checkErrorCode(pT.addProcess("blink"));
+    // checkErrorCode(pT.addProcess("blink"));
+    // checkErrorCode(pT.addProcess("blink"));
+    // checkErrorCode(pT.addProcess("blink"));
+    // checkErrorCode(pT.addProcess("blink"));
+    // checkErrorCode(pT.addProcess("blink"));
+    // checkErrorCode(pT.addProcess("blink"));
+    // checkErrorCode(pT.addProcess("blink"));
+    // checkErrorCode(pT.addProcess("blink"));
 
-    for(int i = 0; i < 2; i++){
-        checkErrorCode(pT.terminateProcess(i));
-        checkErrorCode(pT.addProcess("blink"));
-    }
+    // for(int i = 0; i < 2; i++){
+    //     checkErrorCode(pT.terminateProcess(i));
+    //     checkErrorCode(pT.addProcess("blink"));
+    // }
+
+
 }
 
 void loop(){
@@ -112,22 +132,13 @@ void doWhileWaiting(){
 
 
 // -----------------------------------------------------------------------
-// 8162 392
-// 8178 406 +16 +14
-// 8578 836
-// 9232 898
-// 10332 758
-// 12836 790
-// 12822 790
-// 12834 790
-// 12830 790
-// 12822 790
 
-// 11376 1299
 
 void test(){
     FREERAM_PRINT;
 
+    
+    
     // Serial.println((int) sizeof(pT));
     // Serial.println((int) sizeof(procTable));
     // Serial.println((int) sizeof(procTable[6]));
@@ -169,17 +180,17 @@ void test(){
 
     // pT.terminateProcess(11);
 
-    stack(11).pushInt(69);
-    stack(11).pushInt(420);
+    // stack(11).pushInt(69);
+    // stack(11).pushInt(420);
 
-    checkErrorCode(mem.set('a', 11)); // 420
-    checkErrorCode(mem.set('b', 11)); // 69
+    // checkErrorCode(mem.set('a', 11)); // 420
+    // checkErrorCode(mem.set('b', 11)); // 69
 
-    checkErrorCode(mem.get('a', 11));
-    checkErrorCode(mem.get('b', 11));
+    // checkErrorCode(mem.get('a', 11));
+    // checkErrorCode(mem.get('b', 11));
 
-    Serial.println(stack(11).popInt());
-    Serial.println(stack(11).popInt());
+    // Serial.println(stack(11).popInt());
+    // Serial.println(stack(11).popInt());
 
 
     // stack(10).pushFloat(1.1);
@@ -193,6 +204,14 @@ void test(){
 
     // Serial.println(stack(10).popFloat());
     // Serial.println(stack(10).popChar());
+
+    
+    for(int i = 0; i < 12; i++){
+        checkErrorCode(pE.executeInstruction(0));
+    }
+
+    Serial.println(stack(0).popInt());
+
     
 }
 
@@ -260,6 +279,7 @@ void terminate(){
 
     if(!checkErrorCode(pT.terminateProcess(id))) return;
 
+    mem.eraseAll(id);
     Serial.println(F("Process terminated"));
 
 }

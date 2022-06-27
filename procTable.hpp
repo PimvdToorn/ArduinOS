@@ -9,6 +9,7 @@
 typedef struct processData{
     uint16_t pc;    // Program counter
     uint16_t fp;    // File pointer
+    uint16_t lr;    // Loop register
     StackClass stack;
 };
 

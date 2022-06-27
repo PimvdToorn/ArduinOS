@@ -17,14 +17,17 @@ class StackClass{
         StackClass();
         ~StackClass();
 
-        byte peekByte(uint8_t offset = 0);
-        uint8_t peekStrLen();
+        int16_t pushByte(const byte byte);
+        int16_t pushChar(const char c);
+        int16_t pushInt(const int16_t i);
+        int16_t pushFloat(const float f);
+        int16_t pushString(char* s);
 
-        int8_t pushByte(byte byte);
-        int8_t pushChar(char c);
-        int8_t pushInt(int16_t i);
-        int8_t pushFloat(float f);
-        int8_t pushString(char* s);
+        byte peekByte(uint8_t offset = 0);
+        char peekChar();
+        int16_t peekInt();
+        float peekFloat();
+        float peekVal();
 
         byte popByte();
         char popChar();

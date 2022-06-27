@@ -167,6 +167,8 @@ int16_t MemoryClass::set(const char name, const uint8_t id){
         
     }
 
+    return 1;
+
 }
 
 int16_t MemoryClass::get(const char name, const uint8_t id){

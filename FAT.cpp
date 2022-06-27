@@ -78,7 +78,7 @@ uint16_t FATClass::getAddress(const char* name) const{
     if(address == 0) return 0;
 
     uint16_t fileAddress;
-    EEPROM.get(address + 12, fileAddress);
+    EEPROM.get(address + 14, fileAddress);
 
     return fileAddress; 
 }

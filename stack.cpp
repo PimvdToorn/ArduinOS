@@ -10,24 +10,15 @@ StackClass::~StackClass(){
 
 
 
-byte StackClass::peekByte(uint8_t offset = 0){
-    return stack[stackPtr-1-offset];
-}
 
-uint8_t StackClass::peekStrLen(){
-    return peekByte(1);
-}
-
-
-
-int8_t StackClass::pushByte(byte byte){
+int16_t StackClass::pushByte(const byte byte){
     if(stackPtr >= STACKSIZE) return STACKFULLERROR;
 
     stack[stackPtr++] = byte;
     return 1;
 }
 
-int8_t StackClass::pushChar(char c){
+int16_t StackClass::pushChar(const char c){
     if(stackPtr >= STACKSIZE - 1) return STACKFULLERROR;
 
     pushByte(c);
@@ -36,7 +27,7 @@ int8_t StackClass::pushChar(char c){
     return 1;
 }
 
-int8_t StackClass::pushInt(int16_t i){
+int16_t StackClass::pushInt(const int16_t i){
     if(stackPtr >= STACKSIZE - 2) return STACKFULLERROR;
     
     pushByte(highByte(i));
@@ -46,7 +37,7 @@ int8_t StackClass::pushInt(int16_t i){
     return 1;
 }
 
-int8_t StackClass::pushFloat(float f){
+int16_t StackClass::pushFloat(const float f){
     if(stackPtr >= STACKSIZE - 4) return STACKFULLERROR;
 
     byte* b = (byte*) &f;
@@ -59,7 +50,7 @@ int8_t StackClass::pushFloat(float f){
     return 1;
 }
 
-int8_t StackClass::pushString(char* s){
+int16_t StackClass::pushString(char* s){
     uint8_t len = strlen(s) + 1;
     if(stackPtr >= STACKSIZE - (len + 2)) return STACKFULLERROR;
 
@@ -74,6 +65,58 @@ int8_t StackClass::pushString(char* s){
 
     return 1;
 }
+
+
+
+byte StackClass::peekByte(uint8_t offset = 0){
+    return stack[stackPtr-1-offset];
+}
+
+char StackClass::peekChar(){
+    if(stackPtr <= 1 || peekByte() != CHAR) return NULL;
+
+    return peekByte(-1);
+}
+
+int16_t StackClass::peekInt(){
+    if(stackPtr <= 2 || peekByte() != INT) return NULL;
+
+    int16_t i = peekByte(-1);
+    i += peekByte(-2) << 8;
+    return i;
+}
+
+float StackClass::peekFloat(){
+    if(stackPtr <= 4 || peekByte() != FLOAT) return NULL;
+
+    byte b[4];
+    b[0] = peekByte(-1);
+    b[1] = peekByte(-2);
+    b[2] = peekByte(-3);
+    b[3] = peekByte(-4);
+
+    return *(float*) b;
+}
+
+float StackClass::peekVal(){
+    if(stackPtr <= 1) return NULL;
+
+    switch (peekByte()){
+    case CHAR:
+        return peekChar();
+
+    case INT:
+        return peekInt();
+
+    case FLOAT:
+        return peekFloat();
+    
+    default:
+        return NULL;
+    }
+}
+
+
 
 
 

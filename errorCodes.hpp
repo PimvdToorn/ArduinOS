@@ -3,7 +3,7 @@
 
 #define NOTFOUND -1
 
-// Process errors
+// ProcessTable errors
 #define TERMINATED -10
 #define maxActiveERROR -11
 #define MAXTOTALERROR -12
@@ -17,5 +17,10 @@
 
 // File errors
 // #define 
+
+// Process execution errors
+#define UNKNOWNINSTRUCTION -40
+#define NOTAVALUE -41
+#define TYPEERROR -42
 
 
