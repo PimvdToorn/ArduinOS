@@ -7,18 +7,22 @@ FATEntry FATClass::operator[] (uint8_t i) const{
     return entry;
 }
 
+// -----------------------------------------------------------------------
 
+int8_t FATClass::addEntry(const char* name, const uint16_t* size, const uint16_t* address) const{
+    
+    if(size == 0 || (strcmp(name, "") == 0)) return -1;
 
-void FATClass::addEntry(const char* name, const uint16_t* size, const uint16_t* address){
     FATEntry FATEntry = {"", *size, *address};
     strcpy(FATEntry.name, name);
 
     EEPROM.put(FATSTART + FILECOUNT*FATENTRYSIZE, FATEntry);
     ++FILECOUNT;
+    return 1;
 }
 
 
-bool FATClass::deleteEntry(char* name){
+bool FATClass::deleteEntry(const char* name) const{
     for(uint8_t i = 0; i < FILECOUNT; ++i){
         FATEntry file = FATClass::operator[](i);
 
@@ -32,9 +36,10 @@ bool FATClass::deleteEntry(char* name){
     return false;
 }
 
+// -----------------------------------------------------------------------
 
 
-FATEntry FATClass::findFile(char* name){
+FATEntry FATClass::getFATEntry(const char* name) const{
     for(uint8_t i = 0; i < FILECOUNT; ++i){
         FATEntry file = FATClass::operator[](i);
 
@@ -43,14 +48,53 @@ FATEntry FATClass::findFile(char* name){
     return FATEntry{"",0,0};
 }
 
+uint8_t FATClass::getNameAddress(const char* name) const{
+    for(uint8_t i = 0; i < FILECOUNT; ++i){
+        uint8_t address = FATSTART + i*FATENTRYSIZE;
 
+        char fileName[FILENAMELENGTH];
+        EEPROM.get(address, fileName);
+
+        if(strcmp(name, fileName) == 0) return address;
+    }
+
+    return 0;
+}
+
+uint16_t FATClass::getSize(const char* name) const{
+
+    uint8_t address = getNameAddress(name);
+    if(address == 0) return 0;
+
+    uint16_t size;
+    EEPROM.get(address + 12, size);
+
+    return size; 
+}
+
+uint16_t FATClass::getAddress(const char* name) const{
+
+    uint8_t address = getNameAddress(name);
+    if(address == 0) return 0;
+
+    uint16_t fileAddress;
+    EEPROM.get(address + 12, fileAddress);
+
+    return fileAddress; 
+}
+
+
+
+
+
+// -----------------------------------------------------------------------
 
 int compare(const void *a, const void *b){
     /* (a > b) - (a < b) */
     return (*(uint16_t *)a > *(uint16_t *)b) - (*(uint16_t *)a < *(uint16_t *)b);
 }
 
-uint16_t FATClass::largestFreeSpace(){
+uint16_t FATClass::largestFreeSpace() const{
     uint16_t startAddresses[FILECOUNT+1];
     uint16_t endAddresses[FILECOUNT+1];
 
@@ -76,8 +120,7 @@ uint16_t FATClass::largestFreeSpace(){
 
 
 
-
-uint16_t FATClass::totalFreeSpace(){
+uint16_t FATClass::totalFreeSpace() const{
     uint16_t freeSpace = EEPROMSIZE - FILESSTART;
 
     for(uint8_t i = 0; i < FILECOUNT; ++i){
@@ -89,7 +132,7 @@ uint16_t FATClass::totalFreeSpace(){
 
 
 
-uint16_t FATClass::getStoreAddress(uint16_t size){
+uint16_t FATClass::getStoreAddress(uint16_t size) const{
     uint16_t startAddresses[FILECOUNT+1];
     uint16_t endAddresses[FILECOUNT+1];
 

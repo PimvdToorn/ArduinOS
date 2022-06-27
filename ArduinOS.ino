@@ -1,20 +1,18 @@
-#include "instruction_set.h"
-#include "FAT.hpp"
 #include "EEPROM.h"
+#include <MemoryUsage.h>
+
+#include "instruction_set.h"
+#include "errorCodes.h"
+#include "FAT.hpp"
+#include "procTable.hpp"
+
+// -----------------------------------------------------------------------
 
 #define COMMANDLENGTH 12
-
 
 const char SEPARATOR[] = "---------------------------------------------------------";
 
 
-// "output": "C:\\Users\\Pim\\Documents\\.Me\\IT\\Arduino\\VSCode output",
-
-// -----------------------------------------------------------------------
-
-#define FILESIZEDIGITS 5
-
-static FATClass FAT;
 
 // -----------------------------------------------------------------------
 
@@ -22,6 +20,9 @@ static FATClass FAT;
 
 void setup(){
     Serial.begin(9600);
+
+    pT.addProcess("blink");
+    pT.addProcess("blink");
 }
 
 void loop(){
@@ -34,32 +35,125 @@ void doWhileWaiting(){
 }
 
 
+bool checkErrorCode(int8_t code, bool verbose = true){
+    switch (code){
+    case 1:
+        return true;
+
+    case NOTFOUND:
+        Serial.println(F("Not found"));
+        break;
+    
+    case TERMINATED:
+        Serial.println(F("Process is terminated"));
+        break;
+
+    case MAXACTIVEERROR:
+        Serial.println(F("Max active processes reached"));
+        break;
+
+    case MAXTOTALERROR:
+        Serial.println(F("Max total processes reached"));
+        break;
+
+    default:
+        break;
+    }
+
+    return false;
+        
+}
+
+
+// -----------------------------------------------------------------------
+// 8162 392
+// 8178 406 +16 +14
+// 8578 836
+// 9232 898
+
+void run(){
+    Serial.print(F("Program name: "));
+    char programName[FILENAMELENGTH] = ""; 
+    readCommand(programName, FILENAMELENGTH);
+    Serial.println(programName);
+
+    if(!checkErrorCode(pT.addProcess(programName))) return;
+
+
+    Serial.print(F("Process started with id: "));
+    Serial.println(pT.nProcesses - 1);
+}
+
+void list(){
+    Serial.println(F("ID \t\t\tName\t\tStatus"));
+
+    for(int i = 0; i < pT.nProcesses; i++){
+        char name[FILENAMELENGTH];
+        pT.getProcessName(i, name);
+
+        char format[27];
+        sprintf(format, "%-3i %12s\t\t\t  %c", i, name, pT.procTable[i].status);
+        Serial.println(format);
+    }
+}
+
+
+
+void suspend(){
+    Serial.print(F("Process id: "));
+    char idChar[4] = "";
+    readCommand(idChar, 4);
+    const uint8_t id = atoi(idChar);
+    Serial.println(id);
+
+    if(!checkErrorCode(pT.suspendProcess(id))) return;
+
+    Serial.println(F("Process suspended"));
+}
+
+void resume(){
+    Serial.print(F("Process id: "));
+    char idChar[4] = "";
+    readCommand(idChar, 4);
+    const uint8_t id = atoi(idChar);
+    Serial.println(id);
+
+    if(!checkErrorCode(pT.resumeProcess(id))) return;
+
+    Serial.println(F("Process resumed"));
+}
+
+void terminate(){
+    Serial.print(F("Process id: "));
+    char idChar[4] = "";
+    readCommand(idChar, 4);
+    const uint8_t id = atoi(idChar);
+    Serial.println(id);
+
+    checkErrorCode(pT.terminateProcess(id));
+
+}
+
+
+
+
 
 // -----------------------------------------------------------------------
 
 
-
-
-
-
-
-// 4062 430
-// 4062 412
-// 4398 408
-// 4408 408
-// 4490 318
-// 4616 318
-
-
 void store(){
+    if(FILECOUNT >= FATSIZE){
+        Serial.println(F("FAT limit reached"));
+        return;
+    }
+
     Serial.print(F("File name: "));
     char fileName[FILENAMELENGTH] = ""; 
     readCommand(fileName, FILENAMELENGTH);
     Serial.println(fileName);
 
-    if(strcmp(fileName, FAT.findFile(fileName).name) == 0){
+    if(strcmp(fileName, FAT.getFATEntry(fileName).name) == 0){
         Serial.println(F("Filename is taken"));
-
         return;
     }
     
@@ -74,13 +168,7 @@ void store(){
     if(free < fileSize){
         Serial.println(F("Insufficient space"));
 
-        Serial.print(F("Maximum available file size is "));
-        Serial.print(free);
-        Serial.println(F(" bytes"));
-
-        Serial.print(F("Total available space is "));
-        Serial.print(FAT.totalFreeSpace());
-        Serial.println(F(" bytes.   (Requires defragmentation)"));
+        freeSpace();
 
         return;
     }
@@ -122,12 +210,10 @@ void retrieve(){
     readCommand(fileName, FILENAMELENGTH);
     Serial.println(fileName);
 
-    FATEntry file = FAT.findFile(fileName);
+    FATEntry file = FAT.getFATEntry(fileName);
 
     if(file.size == 0) {
-        Serial.print(F("File \""));
-        Serial.print(fileName);
-        Serial.println(F("\" does not exist"));
+        checkErrorCode(NOTFOUND);
         return;
     } 
 
@@ -153,7 +239,7 @@ void erase(){
         Serial.println(F("Deletion succesful"));
         return;
     }
-    Serial.println(F("File not found"));
+    checkErrorCode(NOTFOUND);
 }
 
 void files(){
@@ -167,11 +253,17 @@ void files(){
 }
 
 void freeSpace(){
-    Serial.print(F("Largest free block:\t\t"));
-    Serial.print(FAT.largestFreeSpace());
+    char buf[5];
+
+    sprintf(buf, "%4i", FAT.largestFreeSpace());
+    Serial.print(F("Largest free block: \t"));
+    Serial.print(buf);
     Serial.println(F(" bytes"));
+
+
+    sprintf(buf, "%4i", FAT.totalFreeSpace());
     Serial.print(F("Total free space:\t\t"));
-    Serial.print(FAT.totalFreeSpace());
+    Serial.print(buf);
     Serial.println(F(" bytes"));
 }
 
@@ -185,6 +277,11 @@ typedef struct commandType{
 };
 
 static commandType commands[] = {
+    {"run", &run},
+    {"list", &list},
+    {"suspend", &suspend},
+    {"resume", &resume},
+    {"terminate", &terminate},
     {"store", &store},
     {"retrieve", &retrieve},
     {"erase", &erase},
