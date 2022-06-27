@@ -95,20 +95,22 @@ int compare(const void *a, const void *b){
 }
 
 uint16_t FATClass::largestFreeSpace() const{
-    uint16_t startAddresses[FILECOUNT+1];
+    // End of the last file and start of the next
+    // Used to calculate the empty space between
     uint16_t endAddresses[FILECOUNT+1];
+    uint16_t startAddresses[FILECOUNT+1];
 
     for (uint8_t i = 0; i < FILECOUNT; i++){
         FATEntry entry = FATClass::operator[](i);
-        startAddresses[i] = entry.address;
         endAddresses[i] = entry.address + entry.size;
+        startAddresses[i] = entry.address;
     }
 
-    startAddresses[FILECOUNT] = EEPROMSIZE;
     endAddresses[FILECOUNT] = FILESSTART;
+    startAddresses[FILECOUNT] = EEPROMSIZE;
 
-    qsort(startAddresses, FILECOUNT+1, sizeof(uint16_t), compare);
     qsort(endAddresses, FILECOUNT+1, sizeof(uint16_t), compare);
+    qsort(startAddresses, FILECOUNT+1, sizeof(uint16_t), compare);
 
     uint16_t largest = 0;
     for(uint8_t i = 0; i < FILECOUNT+1; i++){
@@ -133,24 +135,26 @@ uint16_t FATClass::totalFreeSpace() const{
 
 
 uint16_t FATClass::getStoreAddress(uint16_t size) const{
-    uint16_t startAddresses[FILECOUNT+1];
+    // End of the last file and start of the next
+    // Used to calculate the empty space between
     uint16_t endAddresses[FILECOUNT+1];
+    uint16_t startAddresses[FILECOUNT+1];
 
     for (uint8_t i = 0; i < FILECOUNT; i++){
         FATEntry entry = FATClass::operator[](i);
-        startAddresses[i] = entry.address;
         endAddresses[i] = entry.address + entry.size;
+        startAddresses[i] = entry.address;
     }
 
-    startAddresses[FILECOUNT] = EEPROMSIZE;
     endAddresses[FILECOUNT] = FILESSTART;
+    startAddresses[FILECOUNT] = EEPROMSIZE;
 
-    qsort(startAddresses, FILECOUNT+1, sizeof(uint16_t), compare);
     qsort(endAddresses, FILECOUNT+1, sizeof(uint16_t), compare);
+    qsort(startAddresses, FILECOUNT+1, sizeof(uint16_t), compare);
 
 
     uint16_t address;
-    uint16_t smallestSize;
+    uint16_t smallestSize = UINT16_MAX;
 
     for(uint8_t i = 0; i < FILECOUNT+1; i++){
 

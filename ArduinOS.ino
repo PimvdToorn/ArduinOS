@@ -1,28 +1,103 @@
 #include "EEPROM.h"
-#include <MemoryUsage.h>
 
 #include "instruction_set.h"
-#include "errorCodes.h"
+#include "errorCodes.hpp"
 #include "FAT.hpp"
-#include "procTable.hpp"
+
 
 // -----------------------------------------------------------------------
 
 #define COMMANDLENGTH 12
-
 const char SEPARATOR[] = "---------------------------------------------------------";
+
+
+int16_t checkErrorCode(int16_t code){
+    switch (code){
+    case NOTFOUND:
+        Serial.println(F("Not found"));
+        break;
+    
+    case TERMINATED:
+        Serial.println(F("Process is terminated"));
+        break;
+
+    case maxActiveERROR:
+        Serial.println(F("Max active processes reached"));
+        break;
+
+    case MAXTOTALERROR:
+        Serial.println(F("Max total processes reached"));
+        break;
+
+    case STACKFULLERROR:
+        Serial.println(F("Stack full exception"));
+        break;
+
+    case MEMFULLERROR:
+        Serial.println(F("Memory full exception"));
+        break;
+
+    case VARTABLEFULLERROR:
+        Serial.println(F("Variable table full exception"));
+        break;
+
+    default:
+        break;
+    }
+
+    return code;
+        
+}
+
+
+// -----------------------------------------------------------------------
+
+#include "procTable.hpp"
+
+static uint8_t maxProcesses = 64;
+static uint8_t maxActive  = 10;
+
+static process* procTable = new process[maxProcesses];
+static uint8_t nActiveProcesses = 0;
+static uint8_t nProcesses = 0;
+static ProcTableClass pT(procTable, &nActiveProcesses, &nProcesses, &maxProcesses, &maxActive);
+
+
+
+
+#include "memory.hpp"
+
+static uint16_t memSize = 256;
+static uint8_t varTableSize  = 32;
+
+static byte* memory = new byte[memSize];
+static variable* varTable = new variable[varTableSize];
+static uint8_t nVariables = 0;
+
+static MemoryClass mem(memory, varTable, &nVariables, &memSize, &varTableSize, procTable);
 
 
 
 // -----------------------------------------------------------------------
 
-
-
 void setup(){
     Serial.begin(9600);
 
-    pT.addProcess("blink");
-    pT.addProcess("blink");
+    checkErrorCode(pT.addProcess("blink"));
+    checkErrorCode(pT.addProcess("blink"));
+    checkErrorCode(pT.addProcess("blink"));
+    checkErrorCode(pT.addProcess("blink"));
+    checkErrorCode(pT.addProcess("blink"));
+    checkErrorCode(pT.addProcess("blink"));
+    checkErrorCode(pT.addProcess("blink"));
+    checkErrorCode(pT.addProcess("blink"));
+    checkErrorCode(pT.addProcess("blink"));
+    checkErrorCode(pT.addProcess("blink"));
+
+    for(int i = 0; i < 2; i++){
+        checkErrorCode(pT.terminateProcess(i));
+        checkErrorCode(pT.addProcess("blink"));
+    }
 }
 
 void loop(){
@@ -35,41 +110,94 @@ void doWhileWaiting(){
 }
 
 
-bool checkErrorCode(int8_t code, bool verbose = true){
-    switch (code){
-    case 1:
-        return true;
-
-    case NOTFOUND:
-        Serial.println(F("Not found"));
-        break;
-    
-    case TERMINATED:
-        Serial.println(F("Process is terminated"));
-        break;
-
-    case MAXACTIVEERROR:
-        Serial.println(F("Max active processes reached"));
-        break;
-
-    case MAXTOTALERROR:
-        Serial.println(F("Max total processes reached"));
-        break;
-
-    default:
-        break;
-    }
-
-    return false;
-        
-}
-
 
 // -----------------------------------------------------------------------
 // 8162 392
 // 8178 406 +16 +14
 // 8578 836
 // 9232 898
+// 10332 758
+// 12836 790
+// 12822 790
+// 12834 790
+// 12830 790
+// 12822 790
+
+// 11376 1299
+
+void test(){
+    FREERAM_PRINT;
+
+    // Serial.println((int) sizeof(pT));
+    // Serial.println((int) sizeof(procTable));
+    // Serial.println((int) sizeof(procTable[6]));
+    // Serial.println((int) sizeof(*procTable[6].data));
+
+
+    // Serial.println((int) sizeof(mem));
+
+    // Serial.println((int) sizeof(varTable));
+    // Serial.println((int) sizeof(varTable[0]));
+
+    // Serial.println((int) sizeof(memory));
+    // Serial.println((int) sizeof(memory[0]));
+
+    // stack(11).pushInt(69);
+    // stack(11).pushInt(420);
+    // stack(10).pushFloat(1.1);
+    // stack(10).pushChar('c');
+
+    // char string[] = "Hallo";
+    // stack(10).pushString(string);
+
+    // Serial.println((char) stack(11).popChar());
+
+    // Serial.println(stack(11).popFloat());
+
+    // Serial.println(stack(11).popInt());
+
+    // Serial.println(stack(11).popInt());
+
+    // char s[stack(10).peekStrLen()];
+    // stack(10).popString(s);
+    // Serial.println(s);
+
+
+    // Serial.println(mem.freeSpace(4));
+    // // Serial.println(mem.freeSpace(250));
+    // checkErrorCode(mem.freeSpace(250));
+
+    // pT.terminateProcess(11);
+
+    stack(11).pushInt(69);
+    stack(11).pushInt(420);
+
+    checkErrorCode(mem.set('a', 11)); // 420
+    checkErrorCode(mem.set('b', 11)); // 69
+
+    checkErrorCode(mem.get('a', 11));
+    checkErrorCode(mem.get('b', 11));
+
+    Serial.println(stack(11).popInt());
+    Serial.println(stack(11).popInt());
+
+
+    // stack(10).pushFloat(1.1);
+    // stack(10).pushChar('c');
+
+    // checkErrorCode(mem.set('a', 10, &procTable[10]));
+    // checkErrorCode(mem.set('b', 10, &procTable[10]));
+
+    // checkErrorCode(mem.get('a', 10, &procTable[10]));
+    // checkErrorCode(mem.get('b', 10, &procTable[10]));
+
+    // Serial.println(stack(10).popFloat());
+    // Serial.println(stack(10).popChar());
+    
+}
+
+// -----------------------------------------------------------------------
+
 
 void run(){
     Serial.print(F("Program name: "));
@@ -81,18 +209,18 @@ void run(){
 
 
     Serial.print(F("Process started with id: "));
-    Serial.println(pT.nProcesses - 1);
+    Serial.println(nProcesses - 1);
 }
 
 void list(){
     Serial.println(F("ID \t\t\tName\t\tStatus"));
 
-    for(int i = 0; i < pT.nProcesses; i++){
+    for(int i = 0; i < nProcesses; i++){
         char name[FILENAMELENGTH];
         pT.getProcessName(i, name);
 
         char format[27];
-        sprintf(format, "%-3i %12s\t\t\t  %c", i, name, pT.procTable[i].status);
+        sprintf(format, "%-3i %12s\t\t\t  %c", i, name, procTable[i].status);
         Serial.println(format);
     }
 }
@@ -130,7 +258,9 @@ void terminate(){
     const uint8_t id = atoi(idChar);
     Serial.println(id);
 
-    checkErrorCode(pT.terminateProcess(id));
+    if(!checkErrorCode(pT.terminateProcess(id))) return;
+
+    Serial.println(F("Process terminated"));
 
 }
 
@@ -277,6 +407,7 @@ typedef struct commandType{
 };
 
 static commandType commands[] = {
+    {"test", &test},
     {"run", &run},
     {"list", &list},
     {"suspend", &suspend},

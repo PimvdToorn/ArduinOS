@@ -1,7 +1,7 @@
 #pragma once
 #include "Arduino.h"
 #include "EEPROM.h"
-#include "errorCodes.h"
+#include "errorCodes.hpp"
 
 #define EEPROMSIZE 1024
 

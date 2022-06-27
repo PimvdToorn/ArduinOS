@@ -2,13 +2,9 @@
 #include "Arduino.h"
 #include "stack.hpp"
 #include "FAT.hpp"
-#include "errorCodes.h"
+#include "errorCodes.hpp"
 
-// #define PNAMELENGTH 12
-#define MAXPROCESSES 32
-#define MAXACTIVE 10
-
-
+#define stack(a) procTable[a].data->stack
 
 typedef struct processData{
     uint16_t pc;    // Program counter
@@ -32,11 +28,16 @@ typedef struct process{
 
 class ProcTableClass{
     private:
+        uint8_t* maxProcesses; 
+        uint8_t* maxActive;
+
+        process* procTable;
+        uint8_t* nActiveProcesses;
+        uint8_t* nProcesses;
+
 
     public:
-        process procTable[MAXPROCESSES];
-        uint8_t nActiveProcesses = 0;
-        uint8_t nProcesses = 0;
+        ProcTableClass(process* procTable, uint8_t* nActiveProcesses, uint8_t* nProcesses, uint8_t* maxProcesses, uint8_t* maxActive);
 
         int8_t getProcessName(const uint8_t id,char* namePtr);
 
@@ -47,6 +48,6 @@ class ProcTableClass{
 
   
 };
-static ProcTableClass pT;
+
 
 

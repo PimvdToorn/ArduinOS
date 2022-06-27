@@ -1,5 +1,10 @@
 #include "procTable.hpp"
 
+ProcTableClass::ProcTableClass(process* procTable, uint8_t* nActiveProcesses, uint8_t* nProcesses, uint8_t* maxProcesses, uint8_t* maxActive):
+    procTable (procTable), nActiveProcesses (nActiveProcesses), nProcesses (nProcesses), maxProcesses (maxProcesses), maxActive (maxActive){}
+
+
+
 int8_t ProcTableClass::getProcessName(const uint8_t id, char* namePtr){
     if(procTable[id].status == '\0') return -1;
 
@@ -11,11 +16,13 @@ int8_t ProcTableClass::getProcessName(const uint8_t id, char* namePtr){
 }
 
 int8_t ProcTableClass::addProcess(char* name){
-    if(nActiveProcesses >= MAXACTIVE) return MAXACTIVEERROR;
-    if(nProcesses >= MAXPROCESSES) return MAXTOTALERROR;
+
+    if(*nActiveProcesses >= *maxActive) return maxActiveERROR;
+    if(*nProcesses >= *maxProcesses) return MAXTOTALERROR;
     if(FAT.getNameAddress(name) == 0) return NOTFOUND;
 
-    procTable[nProcesses] = process{
+
+    procTable[*nProcesses] = process{
         FAT.getNameAddress(name),
         'r',
         new processData{
@@ -24,8 +31,9 @@ int8_t ProcTableClass::addProcess(char* name){
         }
     };
 
-    nProcesses++;
-    nActiveProcesses++;
+    (*nProcesses)++;
+    (*nActiveProcesses)++;
+
     return 1;
 }
 
@@ -35,8 +43,11 @@ int8_t ProcTableClass::terminateProcess(uint8_t id){
     if(procTable[id].status == 't') return TERMINATED;
 
     delete procTable[id].data;
+    procTable[id].data = nullptr;
+
     procTable[id].status = 't';
-    return TERMINATED;
+    (*nActiveProcesses)--;
+    return 1;
 }
 
 int8_t ProcTableClass::suspendProcess(uint8_t id){
