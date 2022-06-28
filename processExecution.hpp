@@ -11,6 +11,7 @@
 #define pcREAD EEPROM[procTable[id].data->pc++]
 #define pStack procTable[id].data->stack
 #define LR procTable[id].data->lr
+#define ST procTable[id].status
 
 class processExecution{
     private:

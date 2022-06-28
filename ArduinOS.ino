@@ -122,11 +122,26 @@ void setup(){
 
 void loop(){
     executeCommand();
-    delayMicroseconds(65500);
+    doWhileWaiting();
+    // delay(1);
 }
 
 void doWhileWaiting(){
-    delay(1);
+    uint8_t foundActive = 0;
+    // Serial.print("Active: ");
+    // Serial.println(nActiveProcesses);
+    for(uint8_t i = 0; i < nProcesses; i++){
+
+        if(procTable[i].status != 't'){
+            // Serial.print("Found active process with id: ");
+            // Serial.println(i);
+            foundActive++;
+            if(procTable[i].status == 'r') checkErrorCode(pE.executeInstruction(i));
+            if(foundActive >= nActiveProcesses) break;
+        }
+    }
+    
+    // delay(1);
 }
 
 
@@ -206,11 +221,11 @@ void test(){
     // Serial.println(stack(10).popChar());
 
     
-    for(int i = 0; i < 12; i++){
-        checkErrorCode(pE.executeInstruction(0));
-    }
+    // for(int i = 0; i < 12; i++){
+    //     checkErrorCode(pE.executeInstruction(0));
+    // }
 
-    Serial.println(stack(0).popInt());
+    // Serial.println(stack(0).popInt());
 
     
 }
@@ -417,7 +432,76 @@ void freeSpace(){
     Serial.println(F(" bytes"));
 }
 
+void readEEPROM(){
+    Serial.print(F("Address: "));
+    char addressChar[FILESIZEDIGITS] = "";
+    readCommand(addressChar, FILESIZEDIGITS);
+    const uint16_t address = atoi(addressChar);
+    Serial.println(address);
 
+    Serial.print(F("Number of bytes: "));
+    char nBytesChar[FILESIZEDIGITS] = "";
+    readCommand(nBytesChar, FILESIZEDIGITS);
+    const uint16_t nBytes = atoi(nBytesChar);
+    Serial.println(nBytes);
+
+    for(uint16_t i = 0; i < nBytes; i++){
+        char value[6];
+        sprintf(value, "%3i| ", address+i);
+        Serial.print(value);
+    }
+    Serial.println();
+    for(uint16_t i = 0; i < nBytes; i++){
+        char value[6];
+        sprintf(value, "%3i| ", (uint8_t) EEPROM[address+i]);
+        Serial.print(value);
+    }
+    Serial.println();
+
+}
+
+void editEEPROM(){
+    Serial.print(F("Address: "));
+    char addressChar[FILESIZEDIGITS] = "";
+    readCommand(addressChar, FILESIZEDIGITS);
+    const uint16_t address = atoi(addressChar);
+    Serial.println(address);
+
+    Serial.print(F("Number of bytes: "));
+    char nBytesChar[FILESIZEDIGITS] = "";
+    readCommand(nBytesChar, FILESIZEDIGITS);
+    const uint16_t nBytes = atoi(nBytesChar);
+    Serial.println(nBytes);
+
+    Serial.println(F("Bytes as character or 0's and 1's: "));
+    
+    for(uint16_t i = 0; i < nBytes; i++){
+        char byteChar[9] = "";
+        Serial.print(address+i);
+        Serial.print(F(" was: "));
+        Serial.print((uint8_t) EEPROM[address+i]);
+        Serial.print(F("  is now: "));
+        readCommand(byteChar, 9);
+
+        uint8_t b = 0;
+        if(strlen(byteChar) == 1) b = (byte) byteChar[0];
+        else if(strlen(byteChar) == 8){
+            char* c = byteChar;
+            for(int8_t j = 7; j >= 0; j--){
+                	b += (*c - '0') << j;
+                    // Serial.print(b);
+                    c++;
+            }
+        }
+        else {
+            Serial.println(F("\nIncorrect format"));
+            break;
+        }
+        EEPROM[address+i] = b;
+        Serial.println((uint8_t) EEPROM[address+i]);
+    }
+    
+}
 
 // -----------------------------------------------------------------------
 // Command name and reference to the function
@@ -437,7 +521,9 @@ static commandType commands[] = {
     {"retrieve", &retrieve},
     {"erase", &erase},
     {"files", &files},
-    {"freespace", &freeSpace}
+    {"freespace", &freeSpace},
+    {"readeeprom", &readEEPROM},
+    {"editeeprom", &editEEPROM}
 };
 static const uint8_t NoOfCommands = sizeof(commands) / sizeof(commandType);
 
@@ -476,7 +562,7 @@ void executeCommand(){
 
 // Reads a single command from the command line and returns it, 
 void readCommand(char* command, const int length){
-    char* c = command + strlen(command);
+    char* c = command;
 
     while(true){
         if(Serial.available()){
@@ -509,6 +595,9 @@ void clearBuffer(){
     delay(2);
     while(Serial.available()) {
         Serial.read();
-        delay(2);
+        unsigned long time = millis();
+        while(millis() - time > 2){
+            doWhileWaiting();
+        }
     }
 }

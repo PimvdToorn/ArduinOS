@@ -105,7 +105,7 @@ int16_t processExecution::binaryOperators(const uint8_t id, const byte bOperator
     }
 
 
-    switch(bOperator){
+    switch (bOperator){
     case PLUS:
         switch (type){
         case CHAR:
@@ -387,7 +387,16 @@ int16_t processExecution::executeInstruction(const uint8_t id){
         return binaryOperators(id, instruction);
 
     case UNARYMINUS:
-        break;
+        switch (pStack.peekByte()){
+            case CHAR:
+                return pStack.pushChar(-pStack.popChar());
+            case INT:
+                return pStack.pushInt(-pStack.popInt());
+            case FLOAT:
+                return pStack.pushFloat(-pStack.popFloat());
+            default:
+                return NOTAVALUE;
+        }
     
     case EQUALS:
         return binaryOperators(id, instruction);
@@ -417,7 +426,16 @@ int16_t processExecution::executeInstruction(const uint8_t id){
         return binaryOperators(id, instruction);
 
     case LOGICALNOT:
-        break;
+        switch (pStack.peekByte()){
+            case CHAR:
+                return pStack.pushChar(!pStack.popChar());
+            case INT:
+                return pStack.pushChar(!pStack.popInt());
+            case FLOAT:
+                return pStack.pushChar(!pStack.popFloat());
+            default:
+                return NOTAVALUE;
+        }
 
     case BITWISEAND:
         return binaryOperators(id, instruction);
@@ -429,13 +447,52 @@ int16_t processExecution::executeInstruction(const uint8_t id){
         return binaryOperators(id, instruction);
 
     case BITWISENOT:
-        break;
+        switch (pStack.peekByte()){
+            case CHAR:
+                return pStack.pushChar(~pStack.popChar());
+            case INT:
+                return pStack.pushInt(~pStack.popInt());
+            case FLOAT:
+                return TYPEERROR;
+            default:
+                return NOTAVALUE;
+        }
     
     case TOCHAR:
+        switch (pStack.peekByte()){
+            case CHAR:
+                return 1;
+            case INT:
+                return pStack.pushChar((char) pStack.popInt());
+            case FLOAT:
+                return pStack.pushChar((char) pStack.popFloat());
+            default:
+                return NOTAVALUE;
+        }
     
     case TOINT:
+        switch (pStack.peekByte()){
+            case CHAR:
+                return pStack.pushInt((int16_t) pStack.popChar());
+            case INT:
+                return 1;
+            case FLOAT:
+                return pStack.pushInt((int16_t) pStack.popFloat());
+            default:
+                return NOTAVALUE;
+        }
 
     case TOFLOAT:
+        switch (pStack.peekByte()){
+            case CHAR:
+                return pStack.pushFloat((float) pStack.popChar());
+            case INT:
+                return pStack.pushFloat((float) pStack.popInt());
+            case FLOAT:
+                return 1;
+            default:
+                return NOTAVALUE;
+        }
 
     case ROUND:
 
@@ -464,9 +521,15 @@ int16_t processExecution::executeInstruction(const uint8_t id){
 
     case DELAY:
 
-    case DELAYUNTIL:{
-        
-    }
+    case DELAYUNTIL:
+        if(pStack.peekInt() <= ((int16_t) millis())){
+            pStack.popInt();
+            return 1;
+        }
+        else {
+            PC--;
+            return 1;
+        }
 
     case MILLIS:
         return pStack.pushInt((int16_t) millis());
@@ -478,10 +541,16 @@ int16_t processExecution::executeInstruction(const uint8_t id){
     }
 
     case ANALOGREAD:
+        return pStack.pushInt(analogRead(pStack.popVal()));
 
-    case ANALOGWRITE:
+    case ANALOGWRITE:{
+        const float value = pStack.popVal();
+        analogWrite(pStack.popVal(), value);
+        return 1;
+    }
 
     case DIGITALREAD:
+        return pStack.pushChar(digitalRead(pStack.popVal()));
 
     case DIGITALWRITE:{
         const uint8_t value = pStack.popVal();
@@ -490,6 +559,19 @@ int16_t processExecution::executeInstruction(const uint8_t id){
     }
 
     case PRINT:
+        // switch (pStack.peekByte()){
+        //     case CHAR:
+        //         Serial.print(pStack.popChar());
+        //     case INT:
+        //         Serial.print(pStack.popInt());
+        //     case STRING:
+
+        //     case FLOAT:
+
+        //     default:
+        //         return TYPEERROR;
+        // }
+        // return 1;
 
     case PRINTLN:
 
@@ -522,15 +604,20 @@ int16_t processExecution::executeInstruction(const uint8_t id){
         return 1;
 
     case ENDLOOP:
+        PC = LR;
+        return 1;
 
     case STOP:
+        memory->eraseAll(id);
+        ST = 't';
+        return 1;
 
     case FORK:
 
     case WAITUNTILDONE:
 
     default:
-        Serial.print("Unknown instruction: ");
+        Serial.print(F("Unknown instruction: "));
         Serial.println((int) instruction);
         return UNKNOWNINSTRUCTION;
     }

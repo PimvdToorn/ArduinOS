@@ -69,20 +69,22 @@ int16_t StackClass::pushString(char* s){
 
 
 byte StackClass::peekByte(uint8_t offset = 0){
+    if((stackPtr-1-offset) < 0) return NULL;
+    
     return stack[stackPtr-1-offset];
 }
 
 char StackClass::peekChar(){
     if(stackPtr <= 1 || peekByte() != CHAR) return NULL;
 
-    return peekByte(-1);
+    return peekByte(1);
 }
 
 int16_t StackClass::peekInt(){
     if(stackPtr <= 2 || peekByte() != INT) return NULL;
 
-    int16_t i = peekByte(-1);
-    i += peekByte(-2) << 8;
+    int16_t i = peekByte(1);
+    i += peekByte(2) << 8;
     return i;
 }
 
@@ -90,16 +92,15 @@ float StackClass::peekFloat(){
     if(stackPtr <= 4 || peekByte() != FLOAT) return NULL;
 
     byte b[4];
-    b[0] = peekByte(-1);
-    b[1] = peekByte(-2);
-    b[2] = peekByte(-3);
-    b[3] = peekByte(-4);
+    b[0] = peekByte(1);
+    b[1] = peekByte(2);
+    b[2] = peekByte(3);
+    b[3] = peekByte(4);
 
     return *(float*) b;
 }
 
 float StackClass::peekVal(){
-    if(stackPtr <= 1) return NULL;
 
     switch (peekByte()){
     case CHAR:
@@ -172,7 +173,6 @@ char* StackClass::popString(char* s){
 }
 
 float StackClass::popVal(){
-    if(stackPtr <= 1) return NULL;
 
     switch (peekByte()){
     case CHAR:
