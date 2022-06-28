@@ -9,13 +9,14 @@
 
 #define COMMANDLENGTH 12
 const char SEPARATOR[] = "---------------------------------------------------------";
-
+int16_t usingCommandLine = -1;
+int32_t readInt(uint8_t digits = 4);
 
 int16_t checkErrorCode(int16_t code){
     switch (code){
     case 1:
         // Success!
-        break;
+        return 1;
 
     case 0:
         Serial.println(F("General exception"));
@@ -24,12 +25,16 @@ int16_t checkErrorCode(int16_t code){
     case NOTFOUND:
         Serial.println(F("Not found"));
         break;
+
+    case FORMATERROR:
+        Serial.println(F("Incorrect format"));
+        break;
     
     case TERMINATED:
         Serial.println(F("Process is terminated"));
         break;
 
-    case maxActiveERROR:
+    case MAXACTIVEERROR:
         Serial.println(F("Max active processes reached"));
         break;
 
@@ -53,12 +58,21 @@ int16_t checkErrorCode(int16_t code){
         Serial.println(F("Unknown instruction exception"));
         break;
 
+    case NOTAVALUE:
+        Serial.println(F("Not a value exception"));
+        break;
+    
+    case TYPEERROR:
+        Serial.println(F("Type error exception"));
+        break;
+
     default:
         Serial.print(F("Unknown exception: "));
         Serial.println(code);
         break;
     }
 
+    delay(1000);
     return code;
         
 }
@@ -102,46 +116,31 @@ void setup(){
     Serial.begin(9600);
 
     checkErrorCode(pT.addProcess("blink"));
-    // checkErrorCode(pT.addProcess("blink"));
-    // checkErrorCode(pT.addProcess("blink"));
-    // checkErrorCode(pT.addProcess("blink"));
-    // checkErrorCode(pT.addProcess("blink"));
-    // checkErrorCode(pT.addProcess("blink"));
-    // checkErrorCode(pT.addProcess("blink"));
-    // checkErrorCode(pT.addProcess("blink"));
-    // checkErrorCode(pT.addProcess("blink"));
-    // checkErrorCode(pT.addProcess("blink"));
-
-    // for(int i = 0; i < 2; i++){
-    //     checkErrorCode(pT.terminateProcess(i));
-    //     checkErrorCode(pT.addProcess("blink"));
-    // }
-
-
 }
 
 void loop(){
-    executeCommand();
+    if(usingCommandLine == -1) executeCommand();
+    else if(procTable[usingCommandLine].status == 't') usingCommandLine = -1;
+    else if(Serial.available() && Serial.read() == 'd'){
+        pT.terminateProcess(usingCommandLine);
+        Serial.println(F("Terminated"));
+        usingCommandLine = -1;
+    }
+
     doWhileWaiting();
-    // delay(1);
 }
 
 void doWhileWaiting(){
     uint8_t foundActive = 0;
-    // Serial.print("Active: ");
-    // Serial.println(nActiveProcesses);
+
     for(uint8_t i = 0; i < nProcesses; i++){
 
         if(procTable[i].status != 't'){
-            // Serial.print("Found active process with id: ");
-            // Serial.println(i);
             foundActive++;
             if(procTable[i].status == 'r') checkErrorCode(pE.executeInstruction(i));
             if(foundActive >= nActiveProcesses) break;
         }
     }
-    
-    // delay(1);
 }
 
 
@@ -239,10 +238,25 @@ void run(){
     readCommand(programName, FILENAMELENGTH);
     Serial.println(programName);
 
-    if(!checkErrorCode(pT.addProcess(programName))) return;
+    if(checkErrorCode(pT.addProcess(programName)) != 1) return;
 
 
-    Serial.print(F("Process started with id: "));
+    Serial.print(F("Foreground process started with id: "));
+    Serial.println(nProcesses - 1);
+    Serial.println(SEPARATOR);
+    usingCommandLine = nProcesses -1;
+}
+
+void runBG(){
+    Serial.print(F("Program name: "));
+    char programName[FILENAMELENGTH] = ""; 
+    readCommand(programName, FILENAMELENGTH);
+    Serial.println(programName);
+
+    if(checkErrorCode(pT.addProcess(programName)) != 1) return;
+
+
+    Serial.print(F("Background process started with id: "));
     Serial.println(nProcesses - 1);
 }
 
@@ -260,48 +274,96 @@ void list(){
 }
 
 
+uint8_t readId(){
+    Serial.print(F("Process id: "));
+    const uint8_t id = readInt(3);
+    Serial.println(id);
+    return id;
+}
 
 void suspend(){
-    Serial.print(F("Process id: "));
-    char idChar[4] = "";
-    readCommand(idChar, 4);
-    const uint8_t id = atoi(idChar);
-    Serial.println(id);
+    const uint8_t id = readId();
 
-    if(!checkErrorCode(pT.suspendProcess(id))) return;
+    if(checkErrorCode(pT.suspendProcess(id)) != 1) return;
 
     Serial.println(F("Process suspended"));
 }
 
 void resume(){
-    Serial.print(F("Process id: "));
-    char idChar[4] = "";
-    readCommand(idChar, 4);
-    const uint8_t id = atoi(idChar);
-    Serial.println(id);
+    const uint8_t id = readId();
 
-    if(!checkErrorCode(pT.resumeProcess(id))) return;
+    if(checkErrorCode(pT.resumeProcess(id)) != 1) return;
 
     Serial.println(F("Process resumed"));
 }
 
 void terminate(){
-    Serial.print(F("Process id: "));
-    char idChar[4] = "";
-    readCommand(idChar, 4);
-    const uint8_t id = atoi(idChar);
-    Serial.println(id);
+    const uint8_t id = readId();
 
-    if(!checkErrorCode(pT.terminateProcess(id))) return;
+    if(checkErrorCode(pT.terminateProcess(id)) != 1) return;
 
     mem.eraseAll(id);
     Serial.println(F("Process terminated"));
 
 }
 
+void editVar(){
+    const uint8_t id = readId();
+
+    Serial.print(F("Variable name: "));
+
+    uint8_t name = readByte();
+    if(name == 0) return;
+    Serial.println((char) name);
+
+    if(mem.getVar(name, id) == nullptr){
+        checkErrorCode(NOTFOUND);
+        return;
+    }
+
+    Serial.print(F("Numeric type: "));
+    char type[6] = ""; 
+    readCommand(type, 6);
+    Serial.println(type);
 
 
+    Serial.print(F("Value: "));
+    
+    if(strcmp(type, "char") == 0){
+        byte c = readByte();
+        Serial.println(c);
+        checkErrorCode(stack(id).pushChar(c));
+    }
+    else if(strcmp(type, "int") == 0){
+        int16_t i = readInt(6);
+        Serial.println(i);
+        checkErrorCode(stack(id).pushInt(i));
+    }
+    else if(strcmp(type, "float") == 0){
+        char value[12];
+        readCommand(value, 12);
+        float f = atof(value);
+        Serial.println(f);
+        checkErrorCode(stack(id).pushFloat(f));
+    }
+    else{
+        checkErrorCode(TYPEERROR);
+        return;
+    }
 
+    checkErrorCode(mem.set(name, id));
+}
+
+void setPC(){
+    const uint8_t id = readId();
+
+    Serial.print(F("Program counter address: "));
+    char addressChar[FILESIZEDIGITS] = "";
+    const uint16_t address = readInt();
+    Serial.println(address);
+
+    procTable[id].data->pc = address;
+}
 
 // -----------------------------------------------------------------------
 
@@ -324,17 +386,17 @@ void store(){
     
 
     Serial.print(F("File size: "));
-    char fileSizeChar[FILESIZEDIGITS] = "";
-    readCommand(fileSizeChar, FILESIZEDIGITS);
-    const uint16_t fileSize = atoi(fileSizeChar);
+    const uint16_t fileSize = readInt();
     Serial.println(fileSize);
 
     const uint16_t free = FAT.largestFreeSpace();
     if(free < fileSize){
         Serial.println(F("Insufficient space"));
-
         freeSpace();
-
+        return;
+    }
+    else if(fileSize == 0){
+        Serial.println(F("Filesize 0 not allowed"));
         return;
     }
 
@@ -434,15 +496,11 @@ void freeSpace(){
 
 void readEEPROM(){
     Serial.print(F("Address: "));
-    char addressChar[FILESIZEDIGITS] = "";
-    readCommand(addressChar, FILESIZEDIGITS);
-    const uint16_t address = atoi(addressChar);
+    const uint16_t address = readInt();
     Serial.println(address);
 
     Serial.print(F("Number of bytes: "));
-    char nBytesChar[FILESIZEDIGITS] = "";
-    readCommand(nBytesChar, FILESIZEDIGITS);
-    const uint16_t nBytes = atoi(nBytesChar);
+    const uint16_t nBytes = readInt();
     Serial.println(nBytes);
 
     for(uint16_t i = 0; i < nBytes; i++){
@@ -463,40 +521,23 @@ void readEEPROM(){
 void editEEPROM(){
     Serial.print(F("Address: "));
     char addressChar[FILESIZEDIGITS] = "";
-    readCommand(addressChar, FILESIZEDIGITS);
-    const uint16_t address = atoi(addressChar);
+    const uint16_t address = readInt();
     Serial.println(address);
 
     Serial.print(F("Number of bytes: "));
-    char nBytesChar[FILESIZEDIGITS] = "";
-    readCommand(nBytesChar, FILESIZEDIGITS);
-    const uint16_t nBytes = atoi(nBytesChar);
+    const uint16_t nBytes = readInt();
     Serial.println(nBytes);
 
-    Serial.println(F("Bytes as character or 0's and 1's: "));
+    Serial.println(F("Bytes as char or binary: "));
     
     for(uint16_t i = 0; i < nBytes; i++){
-        char byteChar[9] = "";
         Serial.print(address+i);
         Serial.print(F(" was: "));
         Serial.print((uint8_t) EEPROM[address+i]);
         Serial.print(F("  is now: "));
-        readCommand(byteChar, 9);
 
-        uint8_t b = 0;
-        if(strlen(byteChar) == 1) b = (byte) byteChar[0];
-        else if(strlen(byteChar) == 8){
-            char* c = byteChar;
-            for(int8_t j = 7; j >= 0; j--){
-                	b += (*c - '0') << j;
-                    // Serial.print(b);
-                    c++;
-            }
-        }
-        else {
-            Serial.println(F("\nIncorrect format"));
-            break;
-        }
+        uint8_t b = readByte();
+
         EEPROM[address+i] = b;
         Serial.println((uint8_t) EEPROM[address+i]);
     }
@@ -513,10 +554,13 @@ typedef struct commandType{
 static commandType commands[] = {
     {"test", &test},
     {"run", &run},
+    {"runbg", &runBG},
     {"list", &list},
     {"suspend", &suspend},
     {"resume", &resume},
     {"terminate", &terminate},
+    {"editvar", &editVar},
+    {"setpc", &setPC},
     {"store", &store},
     {"retrieve", &retrieve},
     {"erase", &erase},
@@ -588,6 +632,33 @@ void readCommand(char* command, const int length){
 
         doWhileWaiting();
     }
+}
+
+byte readByte(){
+    char byteChar[9] = "";
+    readCommand(byteChar, 9);
+
+    uint8_t b = 0;
+    if(strlen(byteChar) == 1) b = (byte) byteChar[0];
+    else if(strlen(byteChar) == 8){
+        char* c = byteChar;
+        for(int8_t j = 7; j >= 0; j--){
+                b += (*c - '0') << j;
+                c++;
+        }
+    }
+    else {
+        checkErrorCode(FORMATERROR);
+        return;
+    }
+
+    return b;
+}
+
+int32_t readInt(uint8_t digits = 4){
+    char intChar[digits+1] = ""; 
+    readCommand(intChar, digits+1);
+    return atoi(intChar);
 }
 
 void clearBuffer(){

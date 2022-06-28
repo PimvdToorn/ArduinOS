@@ -17,7 +17,7 @@ int8_t ProcTableClass::getProcessName(const uint8_t id, char* namePtr){
 
 int8_t ProcTableClass::addProcess(char* name){
 
-    if(*nActiveProcesses >= *maxActive) return maxActiveERROR;
+    if(*nActiveProcesses >= *maxActive) return MAXACTIVEERROR;
     if(*nProcesses >= *maxProcesses) return MAXTOTALERROR;
     if(FAT.getNameAddress(name) == 0) return NOTFOUND;
 

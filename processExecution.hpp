@@ -21,6 +21,8 @@ class processExecution{
         int16_t unaryOperators(const uint8_t id, const byte uOperator);
         int16_t binaryOperators(const uint8_t id, const byte bOperator);
 
+        int16_t print(const uint8_t id);
+
     public:
         processExecution(process* procTable, MemoryClass* memory);
 

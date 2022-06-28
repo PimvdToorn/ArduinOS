@@ -309,6 +309,32 @@ int16_t processExecution::binaryOperators(const uint8_t id, const byte bOperator
     }
 }
 
+int16_t processExecution::print(const uint8_t id){
+    switch (pStack.peekByte()){
+        case CHAR:
+            Serial.print(pStack.popChar());
+            return 1;
+
+        case INT:
+            Serial.print(pStack.popInt());
+            return 1;
+
+        case STRING:{
+            uint8_t len = pStack.peekByte(1);
+            char s[len];
+            pStack.popString(s);
+            Serial.print(s);
+            return 1;
+        }
+        case FLOAT:
+            Serial.print(pStack.popFloat());
+            return 1;
+
+        default:
+            return TYPEERROR;
+    }
+}
+
 
 
 int16_t processExecution::executeInstruction(const uint8_t id){
@@ -559,21 +585,13 @@ int16_t processExecution::executeInstruction(const uint8_t id){
     }
 
     case PRINT:
-        // switch (pStack.peekByte()){
-        //     case CHAR:
-        //         Serial.print(pStack.popChar());
-        //     case INT:
-        //         Serial.print(pStack.popInt());
-        //     case STRING:
+        return print(id);
 
-        //     case FLOAT:
-
-        //     default:
-        //         return TYPEERROR;
-        // }
-        // return 1;
-
-    case PRINTLN:
+    case PRINTLN:{
+        int16_t r = print(id);
+        Serial.println();
+        return r;
+    }
 
     case OPEN:
 

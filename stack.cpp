@@ -68,6 +68,7 @@ int16_t StackClass::pushString(char* s){
 
 
 
+
 byte StackClass::peekByte(uint8_t offset = 0){
     if((stackPtr-1-offset) < 0) return NULL;
     
@@ -116,10 +117,6 @@ float StackClass::peekVal(){
         return NULL;
     }
 }
-
-
-
-
 
 
 

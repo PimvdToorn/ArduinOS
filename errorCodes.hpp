@@ -2,10 +2,11 @@
 #include <MemoryUsage.h>
 
 #define NOTFOUND -1
+#define FORMATERROR -2
 
 // ProcessTable errors
 #define TERMINATED -10
-#define maxActiveERROR -11
+#define MAXACTIVEERROR -11
 #define MAXTOTALERROR -12
 
 // Stack errors
