@@ -16,12 +16,14 @@
 #define MEMFULLERROR -30
 #define VARTABLEFULLERROR -31
 
-// File errors
-// #define 
-
 // Process execution errors
 #define UNKNOWNINSTRUCTION -40
 #define NOTAVALUE -41
 #define TYPEERROR -42
+#define ENDOFEEPROM -43
+
+// File errors
+#define EMPTYARGERROR -50
+#define INSUFFICIENTSPACE -51
 
 

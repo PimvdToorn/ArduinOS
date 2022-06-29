@@ -5,15 +5,14 @@
 
 #define STACKSIZE 32
 
-// #define POP --stackPtr
-// #define PEEK stack[stackPtr-1]
 
 class StackClass{
     private:
+
+    public:
         byte* stack;
         uint8_t stackPtr = 0;
 
-    public:
         StackClass();
         ~StackClass();
 
@@ -34,6 +33,7 @@ class StackClass{
         int16_t popInt();
         float popFloat();
         char* popString(char* s);
+        int16_t popExact();
         float popVal();
 
 };

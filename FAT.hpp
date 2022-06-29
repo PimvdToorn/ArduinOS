@@ -29,7 +29,7 @@ class FATClass{
 
         FATEntry operator [] (uint8_t i) const;
 
-        int8_t addEntry(const char* name, const uint16_t* size, const uint16_t* address) const; 
+        int16_t addEntry(const char* name, const uint16_t* size, const uint16_t* address) const; 
         bool deleteEntry(const char* name) const;
 
         FATEntry getFATEntry(const char* name) const;

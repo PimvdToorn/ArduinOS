@@ -9,9 +9,9 @@ FATEntry FATClass::operator[] (uint8_t i) const{
 
 // -----------------------------------------------------------------------
 
-int8_t FATClass::addEntry(const char* name, const uint16_t* size, const uint16_t* address) const{
+int16_t FATClass::addEntry(const char* name, const uint16_t* size, const uint16_t* address) const{
     
-    if(size == 0 || (strcmp(name, "") == 0)) return -1;
+    if(size == 0 || (strcmp(name, "") == 0)) return EMPTYARGERROR;
 
     FATEntry FATEntry = {"", *size, *address};
     strcpy(FATEntry.name, name);
@@ -153,7 +153,7 @@ uint16_t FATClass::getStoreAddress(uint16_t size) const{
     qsort(startAddresses, FILECOUNT+1, sizeof(uint16_t), compare);
 
 
-    uint16_t address;
+    uint16_t address = 0;
     uint16_t smallestSize = UINT16_MAX;
 
     for(uint8_t i = 0; i < FILECOUNT+1; i++){

@@ -1,7 +1,7 @@
 #include "processExecution.hpp"
 
-processExecution::processExecution(process* procTable, MemoryClass* memory):
-    procTable (procTable), memory (memory){}
+processExecution::processExecution(process* procTable, MemoryClass* memory, ProcTableClass* ptc):
+    procTable (procTable), memory (memory), ptc (ptc){}
 
 
 
@@ -327,7 +327,7 @@ int16_t processExecution::print(const uint8_t id){
             return 1;
         }
         case FLOAT:
-            Serial.print(pStack.popFloat());
+            Serial.print(pStack.popFloat(), 14);
             return 1;
 
         default:
@@ -335,10 +335,38 @@ int16_t processExecution::print(const uint8_t id){
     }
 }
 
+int16_t processExecution::write(const uint8_t id){
+    uint8_t type = pStack.popByte();
+    if(type > 4) return TYPEERROR;
+
+    if(type == STRING){
+        uint8_t len = pStack.popByte();
+
+        FP += len; 
+        if(FP > EEPROMSIZE) return ENDOFEEPROM;
+
+        for(uint8_t i = 1; i <= len; i++){
+            EEPROM[FP-i] = pStack.popByte();
+        }
+    }
+    else{
+        FP += type;
+        if(FP > EEPROMSIZE) return ENDOFEEPROM;
+
+        for(uint8_t i = 1; i <= type; i++){
+            EEPROM[FP-i] = pStack.popByte();
+        }
+    }
+
+    return 1;
+}
+
 
 
 int16_t processExecution::executeInstruction(const uint8_t id){
     const uint8_t instruction = pcREAD;
+    // Serial.print("Instruction: ");
+    // Serial.println(instruction);
 
     switch (instruction){
     case CHAR:
@@ -352,6 +380,7 @@ int16_t processExecution::executeInstruction(const uint8_t id){
 
     case STRING:{
         const uint16_t start = PC;
+
         do{
             pStack.pushByte(pcREAD);
         } while(pStack.peekByte() != '\0');
@@ -499,7 +528,8 @@ int16_t processExecution::executeInstruction(const uint8_t id){
     case TOINT:
         switch (pStack.peekByte()){
             case CHAR:
-                return pStack.pushInt((int16_t) pStack.popChar());
+                return pStack.pushInt((uint8_t) pStack.popChar());
+                return 1;
             case INT:
                 return 1;
             case FLOAT:
@@ -593,19 +623,51 @@ int16_t processExecution::executeInstruction(const uint8_t id){
         return r;
     }
 
-    case OPEN:
+    case OPEN:{
+        const uint16_t size = pStack.popExact();
+        char fileName[FILENAMELENGTH];
+        pStack.popString(fileName);
+        FP = FAT.getAddress(fileName);
+        if(FP != 0) return 1;
+
+        FP = FAT.getStoreAddress(size);
+        if(FP == 0) return INSUFFICIENTSPACE;
+        return FAT.addEntry(fileName, &size, &FP);
+    }
 
     case CLOSE:
+        return 1;
 
     case WRITE:
+        return write(id);
 
     case READINT:
+        pStack.pushByte(EEPROM[FP++]);
+        pStack.pushByte(EEPROM[FP++]);
+        return pStack.pushByte(INT);
 
     case READCHAR:
+        pStack.pushByte(EEPROM[FP++]);
+        return pStack.pushByte(CHAR);
 
     case READFLOAT:
+        pStack.pushByte(EEPROM[FP++]);
+        pStack.pushByte(EEPROM[FP++]);
+        pStack.pushByte(EEPROM[FP++]);
+        pStack.pushByte(EEPROM[FP++]);
+        return pStack.pushByte(FLOAT);
 
-    case READSTRING:
+    case READSTRING:{
+        uint8_t len = 0;
+
+        do{
+            pStack.pushByte(EEPROM[FP++]);
+            len++;
+        } while(EEPROM[FP-1] != '\0');
+
+        pStack.pushByte(len);
+        return pStack.pushByte(STRING);
+    }
 
     case IF:
 
@@ -614,8 +676,16 @@ int16_t processExecution::executeInstruction(const uint8_t id){
     case ENDIF:
 
     case WHILE:
+        if(pStack.popVal() == 0){
+            PC++;
+            PC += pcREAD + 1;
+            return 1;
+        }
+        return pStack.pushByte(pcREAD + pcREAD + 4);
 
     case ENDWHILE:
+        PC -= pStack.popByte();
+        return 1;
 
     case LOOP:
         LR = PC;
@@ -627,7 +697,7 @@ int16_t processExecution::executeInstruction(const uint8_t id){
 
     case STOP:
         memory->eraseAll(id);
-        ST = 't';
+        return ptc->terminateProcess(id);
         return 1;
 
     case FORK:

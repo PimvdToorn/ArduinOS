@@ -15,7 +15,7 @@ int8_t ProcTableClass::getProcessName(const uint8_t id, char* namePtr){
     return 1;
 }
 
-int8_t ProcTableClass::addProcess(char* name){
+int16_t ProcTableClass::addProcess(char* name){
 
     if(*nActiveProcesses >= *maxActive) return MAXACTIVEERROR;
     if(*nProcesses >= *maxProcesses) return MAXTOTALERROR;
@@ -28,17 +28,18 @@ int8_t ProcTableClass::addProcess(char* name){
         new processData{
             FAT.getAddress(name),
             0,
+            0,
         }
     };
 
     (*nProcesses)++;
     (*nActiveProcesses)++;
 
-    return 1;
+    return (*nProcesses)-1;
 }
 
 
-int8_t ProcTableClass::terminateProcess(uint8_t id){
+int16_t ProcTableClass::terminateProcess(uint8_t id){
     if(procTable[id].status == '\0') return NOTFOUND;
     if(procTable[id].status == 't') return TERMINATED;
 
@@ -50,7 +51,7 @@ int8_t ProcTableClass::terminateProcess(uint8_t id){
     return 1;
 }
 
-int8_t ProcTableClass::suspendProcess(uint8_t id){
+int16_t ProcTableClass::suspendProcess(uint8_t id){
     if(procTable[id].status == '\0') return NOTFOUND;
     if(procTable[id].status == 't') return TERMINATED;
 
@@ -58,7 +59,7 @@ int8_t ProcTableClass::suspendProcess(uint8_t id){
     return 1;
 }
 
-int8_t ProcTableClass::resumeProcess(uint8_t id){
+int16_t ProcTableClass::resumeProcess(uint8_t id){
     if(procTable[id].status == '\0') return NOTFOUND;
     if(procTable[id].status == 't') return TERMINATED;
 

@@ -11,8 +11,9 @@
 const char SEPARATOR[] = "---------------------------------------------------------";
 int16_t usingCommandLine = -1;
 int32_t readInt(uint8_t digits = 4);
+#define BYTESPERLINE 20
 
-int16_t checkErrorCode(int16_t code){
+int16_t printErrorCode(int16_t code){
     switch (code){
     case 1:
         // Success!
@@ -66,13 +67,25 @@ int16_t checkErrorCode(int16_t code){
         Serial.println(F("Type error exception"));
         break;
 
+    case ENDOFEEPROM:
+        Serial.println(F("End of EEPROM exception"));
+        break;
+
+    case EMPTYARGERROR:
+        Serial.println(F("Empty argument exception"));
+        break;
+
+    case INSUFFICIENTSPACE:
+        Serial.println(F("Insufficient available EEPROM exception"));
+        break;
+
     default:
         Serial.print(F("Unknown exception: "));
         Serial.println(code);
         break;
     }
 
-    delay(1000);
+    // delay(1000);
     return code;
         
 }
@@ -88,7 +101,7 @@ static uint8_t maxActive  = 10;
 static process* procTable = new process[maxProcesses];
 static uint8_t nActiveProcesses = 0;
 static uint8_t nProcesses = 0;
-static ProcTableClass pT(procTable, &nActiveProcesses, &nProcesses, &maxProcesses, &maxActive);
+static ProcTableClass ptc(procTable, &nActiveProcesses, &nProcesses, &maxProcesses, &maxActive);
 
 
 
@@ -105,39 +118,52 @@ static uint8_t nVariables = 0;
 static MemoryClass mem(memory, varTable, &nVariables, &memSize, &varTableSize, procTable);
 
 
+
+
 #include "processExecution.hpp"
 
-static processExecution pE(procTable, &mem);
+static processExecution pE(procTable, &mem, &ptc);
 
 
 // -----------------------------------------------------------------------
 
 void setup(){
     Serial.begin(9600);
-
-    checkErrorCode(pT.addProcess("blink"));
 }
 
 void loop(){
     if(usingCommandLine == -1) executeCommand();
     else if(procTable[usingCommandLine].status == 't') usingCommandLine = -1;
     else if(Serial.available() && Serial.read() == 'd'){
-        pT.terminateProcess(usingCommandLine);
+        ptc.terminateProcess(usingCommandLine);
         Serial.println(F("Terminated"));
         usingCommandLine = -1;
     }
 
-    doWhileWaiting();
+    executeProcesses();
 }
 
-void doWhileWaiting(){
+void executeProcesses(){
     uint8_t foundActive = 0;
 
     for(uint8_t i = 0; i < nProcesses; i++){
 
         if(procTable[i].status != 't'){
+            
+            if(procTable[i].status == 'r'){
+                int16_t exitCode = pE.executeInstruction(i);
+                if(exitCode != 1){
+                    printErrorCode(exitCode);
+                    ptc.terminateProcess(i);
+                    // procTable[i].status = 't';
+                    Serial.print(F("Process "));
+                    Serial.print(i);
+                    Serial.print(F(" terminated with exit code: "));
+                    Serial.println(exitCode);
+                };
+            }
+                
             foundActive++;
-            if(procTable[i].status == 'r') checkErrorCode(pE.executeInstruction(i));
             if(foundActive >= nActiveProcesses) break;
         }
     }
@@ -151,9 +177,33 @@ void doWhileWaiting(){
 void test(){
     FREERAM_PRINT;
 
+    // for(int i = 0; i < nProcesses; i++){
+    //     Serial.print((uint16_t) mem.getVar('p', i));
+    //     Serial.print(' ');
+    //     Serial.print((uint16_t) procTable[i].data->pc);
+    //     Serial.print(' ');
+    //     Serial.print((uint16_t) procTable[i].data);
+    //     Serial.print(' ');
+    //     Serial.print((uint16_t) stack(i).stack);
+    //     Serial.print(' ');
+    //     Serial.println(stack(i).stackPtr);
+    // }
+    
+    // Serial.println(stack(1).stackPtr);
+
+    // Serial.println((char) stack(0).popChar());
+    // Serial.println(stack(0).popInt());
+
+    // FILECOUNT = 6;
+
+    // char s[stack(0).peekByte(1)];
+    // stack(0).popString(s);
+    // Serial.println(s);
+
+
     
     
-    // Serial.println((int) sizeof(pT));
+    // Serial.println((int) sizeof(ptc));
     // Serial.println((int) sizeof(procTable));
     // Serial.println((int) sizeof(procTable[6]));
     // Serial.println((int) sizeof(*procTable[6].data));
@@ -173,7 +223,7 @@ void test(){
     // stack(10).pushChar('c');
 
     // char string[] = "Hallo";
-    // stack(10).pushString(string);
+    // stack(0).pushString(string);
 
     // Serial.println((char) stack(11).popChar());
 
@@ -183,25 +233,25 @@ void test(){
 
     // Serial.println(stack(11).popInt());
 
-    // char s[stack(10).peekStrLen()];
-    // stack(10).popString(s);
+    // char s[stack(0).peekByte(1)];
+    // stack(0).popString(s);
     // Serial.println(s);
 
 
     // Serial.println(mem.freeSpace(4));
     // // Serial.println(mem.freeSpace(250));
-    // checkErrorCode(mem.freeSpace(250));
+    // printErrorCode(mem.freeSpace(250));
 
-    // pT.terminateProcess(11);
+    // ptc.terminateProcess(11);
 
     // stack(11).pushInt(69);
     // stack(11).pushInt(420);
 
-    // checkErrorCode(mem.set('a', 11)); // 420
-    // checkErrorCode(mem.set('b', 11)); // 69
+    // printErrorCode(mem.set('a', 11)); // 420
+    // printErrorCode(mem.set('b', 11)); // 69
 
-    // checkErrorCode(mem.get('a', 11));
-    // checkErrorCode(mem.get('b', 11));
+    // printErrorCode(mem.get('a', 11));
+    // printErrorCode(mem.get('b', 11));
 
     // Serial.println(stack(11).popInt());
     // Serial.println(stack(11).popInt());
@@ -210,18 +260,18 @@ void test(){
     // stack(10).pushFloat(1.1);
     // stack(10).pushChar('c');
 
-    // checkErrorCode(mem.set('a', 10, &procTable[10]));
-    // checkErrorCode(mem.set('b', 10, &procTable[10]));
+    // printErrorCode(mem.set('a', 10, &procTable[10]));
+    // printErrorCode(mem.set('b', 10, &procTable[10]));
 
-    // checkErrorCode(mem.get('a', 10, &procTable[10]));
-    // checkErrorCode(mem.get('b', 10, &procTable[10]));
+    // printErrorCode(mem.get('a', 10, &procTable[10]));
+    // printErrorCode(mem.get('b', 10, &procTable[10]));
 
     // Serial.println(stack(10).popFloat());
     // Serial.println(stack(10).popChar());
 
     
     // for(int i = 0; i < 12; i++){
-    //     checkErrorCode(pE.executeInstruction(0));
+    //     printErrorCode(pE.executeInstruction(0));
     // }
 
     // Serial.println(stack(0).popInt());
@@ -238,7 +288,7 @@ void run(){
     readCommand(programName, FILENAMELENGTH);
     Serial.println(programName);
 
-    if(checkErrorCode(pT.addProcess(programName)) != 1) return;
+    if(printErrorCode(ptc.addProcess(programName)) != 1) return;
 
 
     Serial.print(F("Foreground process started with id: "));
@@ -253,19 +303,23 @@ void runBG(){
     readCommand(programName, FILENAMELENGTH);
     Serial.println(programName);
 
-    if(checkErrorCode(pT.addProcess(programName)) != 1) return;
+    int16_t id = ptc.addProcess(programName);
+    if(id < 0){
+        printErrorCode(id);
+        return;
+    }
 
 
     Serial.print(F("Background process started with id: "));
-    Serial.println(nProcesses - 1);
+    Serial.println(id);
 }
 
 void list(){
-    Serial.println(F("ID \t\t\tName\t\tStatus"));
+    Serial.println(F("ID \t\t\tName\t\t\tStatus"));
 
     for(int i = 0; i < nProcesses; i++){
         char name[FILENAMELENGTH];
-        pT.getProcessName(i, name);
+        ptc.getProcessName(i, name);
 
         char format[27];
         sprintf(format, "%-3i %12s\t\t\t  %c", i, name, procTable[i].status);
@@ -284,7 +338,7 @@ uint8_t readId(){
 void suspend(){
     const uint8_t id = readId();
 
-    if(checkErrorCode(pT.suspendProcess(id)) != 1) return;
+    if(printErrorCode(ptc.suspendProcess(id)) != 1) return;
 
     Serial.println(F("Process suspended"));
 }
@@ -292,7 +346,7 @@ void suspend(){
 void resume(){
     const uint8_t id = readId();
 
-    if(checkErrorCode(pT.resumeProcess(id)) != 1) return;
+    if(printErrorCode(ptc.resumeProcess(id)) != 1) return;
 
     Serial.println(F("Process resumed"));
 }
@@ -300,7 +354,7 @@ void resume(){
 void terminate(){
     const uint8_t id = readId();
 
-    if(checkErrorCode(pT.terminateProcess(id)) != 1) return;
+    if(printErrorCode(ptc.terminateProcess(id)) != 1) return;
 
     mem.eraseAll(id);
     Serial.println(F("Process terminated"));
@@ -317,7 +371,7 @@ void editVar(){
     Serial.println((char) name);
 
     if(mem.getVar(name, id) == nullptr){
-        checkErrorCode(NOTFOUND);
+        printErrorCode(NOTFOUND);
         return;
     }
 
@@ -332,26 +386,26 @@ void editVar(){
     if(strcmp(type, "char") == 0){
         byte c = readByte();
         Serial.println(c);
-        checkErrorCode(stack(id).pushChar(c));
+        printErrorCode(stack(id).pushChar(c));
     }
     else if(strcmp(type, "int") == 0){
         int16_t i = readInt(6);
         Serial.println(i);
-        checkErrorCode(stack(id).pushInt(i));
+        printErrorCode(stack(id).pushInt(i));
     }
     else if(strcmp(type, "float") == 0){
         char value[12];
         readCommand(value, 12);
         float f = atof(value);
         Serial.println(f);
-        checkErrorCode(stack(id).pushFloat(f));
+        printErrorCode(stack(id).pushFloat(f));
     }
     else{
-        checkErrorCode(TYPEERROR);
+        printErrorCode(TYPEERROR);
         return;
     }
 
-    checkErrorCode(mem.set(name, id));
+    printErrorCode(mem.set(name, id));
 }
 
 void setPC(){
@@ -363,6 +417,28 @@ void setPC(){
     Serial.println(address);
 
     procTable[id].data->pc = address;
+}
+
+void readStack(){
+    const uint8_t id = readId();
+
+    Serial.print(F("Stackpointer: "));
+    Serial.println(stack(id).stackPtr);
+
+    for(uint16_t line = 0; line < STACKSIZE; line += BYTESPERLINE){
+        for(uint16_t i = line; i < line + BYTESPERLINE && i < STACKSIZE; i++){
+            char value[7];
+            sprintf(value, "%4i| ", i);
+            Serial.print(value);
+        }
+        Serial.println();
+        for(uint16_t i = line; i < line + BYTESPERLINE && i < STACKSIZE; i++){
+            char value[7];
+            sprintf(value, "%4i| ", (uint8_t) *(stack(id).stack+i));
+            Serial.print(value);
+        }
+        Serial.println('\n');
+    }
 }
 
 // -----------------------------------------------------------------------
@@ -417,7 +493,7 @@ void store(){
             Serial.print(c);
         }
 
-        doWhileWaiting();
+        executeProcesses();
     }
     Serial.println();
     Serial.println(F("Done writing"));
@@ -440,7 +516,7 @@ void retrieve(){
     FATEntry file = FAT.getFATEntry(fileName);
 
     if(file.size == 0) {
-        checkErrorCode(NOTFOUND);
+        printErrorCode(NOTFOUND);
         return;
     } 
 
@@ -466,7 +542,7 @@ void erase(){
         Serial.println(F("Deletion succesful"));
         return;
     }
-    checkErrorCode(NOTFOUND);
+    printErrorCode(NOTFOUND);
 }
 
 void files(){
@@ -489,7 +565,7 @@ void freeSpace(){
 
 
     sprintf(buf, "%4i", FAT.totalFreeSpace());
-    Serial.print(F("Total free space:\t\t"));
+    Serial.print(F("Total free space: \t\t"));
     Serial.print(buf);
     Serial.println(F(" bytes"));
 }
@@ -503,22 +579,26 @@ void readEEPROM(){
     const uint16_t nBytes = readInt();
     Serial.println(nBytes);
 
-    for(uint16_t i = 0; i < nBytes; i++){
-        char value[6];
-        sprintf(value, "%3i| ", address+i);
-        Serial.print(value);
+
+    for(uint16_t line = 0; line < nBytes; line += BYTESPERLINE){
+        for(uint16_t i = line; i < line + BYTESPERLINE && i < nBytes; i++){
+            char value[6];
+            sprintf(value, "%3i| ", address+i);
+            Serial.print(value);
+        }
+        Serial.println();
+        for(uint16_t i = line; i < line + BYTESPERLINE && i < nBytes; i++){
+            char value[6];
+            sprintf(value, "%3i| ", (uint8_t) EEPROM[address+i]);
+            Serial.print(value);
+        }
+        Serial.println('\n');
     }
-    Serial.println();
-    for(uint16_t i = 0; i < nBytes; i++){
-        char value[6];
-        sprintf(value, "%3i| ", (uint8_t) EEPROM[address+i]);
-        Serial.print(value);
-    }
-    Serial.println();
+    
 
 }
 
-void editEEPROM(){
+void writeEEPROM(){
     Serial.print(F("Address: "));
     char addressChar[FILESIZEDIGITS] = "";
     const uint16_t address = readInt();
@@ -528,7 +608,7 @@ void editEEPROM(){
     const uint16_t nBytes = readInt();
     Serial.println(nBytes);
 
-    Serial.println(F("Bytes as char or binary: "));
+    Serial.println(F("Bytes:"));
     
     for(uint16_t i = 0; i < nBytes; i++){
         Serial.print(address+i);
@@ -561,13 +641,14 @@ static commandType commands[] = {
     {"terminate", &terminate},
     {"editvar", &editVar},
     {"setpc", &setPC},
+    {"readstack", &readStack},
     {"store", &store},
     {"retrieve", &retrieve},
     {"erase", &erase},
     {"files", &files},
     {"freespace", &freeSpace},
     {"readeeprom", &readEEPROM},
-    {"editeeprom", &editEEPROM}
+    {"writeeeprom", &writeEEPROM}
 };
 static const uint8_t NoOfCommands = sizeof(commands) / sizeof(commandType);
 
@@ -630,7 +711,7 @@ void readCommand(char* command, const int length){
             if(c == command + length - 1) return;
         }
 
-        doWhileWaiting();
+        executeProcesses();
     }
 }
 
@@ -639,7 +720,13 @@ byte readByte(){
     readCommand(byteChar, 9);
 
     uint8_t b = 0;
-    if(strlen(byteChar) == 1) b = (byte) byteChar[0];
+
+    if(strlen(byteChar) == 1 && (byteChar[0] < '0' || byteChar[0] > '9')){
+        b = (uint8_t) byteChar[0];
+    }
+
+    else if(strlen(byteChar) <= 3) b = (uint8_t) atoi(byteChar);
+
     else if(strlen(byteChar) == 8){
         char* c = byteChar;
         for(int8_t j = 7; j >= 0; j--){
@@ -647,8 +734,9 @@ byte readByte(){
                 c++;
         }
     }
+
     else {
-        checkErrorCode(FORMATERROR);
+        printErrorCode(FORMATERROR);
         return;
     }
 
@@ -663,12 +751,18 @@ int32_t readInt(uint8_t digits = 4){
 
 void clearBuffer(){
 
-    delay(2);
+    unsigned long time = millis();
+
+    while(millis() - time < 2){
+        executeProcesses();
+    }
+
     while(Serial.available()) {
         Serial.read();
-        unsigned long time = millis();
-        while(millis() - time > 2){
-            doWhileWaiting();
+
+        time = millis();
+        while(millis() - time < 2){
+            executeProcesses();
         }
     }
 }

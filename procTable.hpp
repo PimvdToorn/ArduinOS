@@ -42,10 +42,10 @@ class ProcTableClass{
 
         int8_t getProcessName(const uint8_t id,char* namePtr);
 
-        int8_t addProcess(char* name);
-        int8_t terminateProcess(uint8_t id);
-        int8_t suspendProcess(uint8_t id);
-        int8_t resumeProcess(uint8_t id);
+        int16_t addProcess(char* name);
+        int16_t terminateProcess(uint8_t id);
+        int16_t suspendProcess(uint8_t id);
+        int16_t resumeProcess(uint8_t id);
 
   
 };

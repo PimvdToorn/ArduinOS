@@ -20,6 +20,7 @@ variable* MemoryClass::getVar(const char name, const uint8_t id){
 }
 
 int16_t MemoryClass::eraseVar(const char name, const uint8_t id){
+
     for(uint8_t i = 0; i < *nVariables; i++){
 
         if(varTable[i].id == id && varTable[i].name == name){
@@ -35,7 +36,6 @@ int16_t MemoryClass::eraseVar(const char name, const uint8_t id){
 }
 
 int16_t MemoryClass::eraseAll(const uint8_t id){
-    int16_t erased = NOTFOUND;
 
     for(uint8_t i = 0; i < *nVariables; i++){
 
@@ -46,12 +46,10 @@ int16_t MemoryClass::eraseAll(const uint8_t id){
             
             // Decrement so the new var at i gets checked
             i--;
-
-            erased = 1;
         }
     }
 
-    return erased;
+    return 1;
 }
 
 
@@ -67,10 +65,12 @@ int compare16(const void *a, const void *b){
 }
 
 int16_t MemoryClass::freeSpace(const uint8_t size){
+    if(*nVariables == 0) return 0;
+
     // End of the last var and start of the next
     // Used to calculate the empty space between
-    uint8_t endAddresses[*nVariables+1];
-    uint16_t startAddresses[*nVariables+1];
+    uint8_t endAddresses[(*nVariables)+1];
+    uint16_t startAddresses[(*nVariables)+1];
 
     for (uint8_t i = 0; i < *nVariables; i++){
         uint8_t thisSize = varTable[i].type == STRING ? memory[varTable[i].address] : varTable[i].type;
@@ -81,16 +81,13 @@ int16_t MemoryClass::freeSpace(const uint8_t size){
     endAddresses[*nVariables] = 0;
     startAddresses[*nVariables] = *memSize;
 
-
-    qsort(endAddresses, *nVariables+1, sizeof(uint8_t), compare8);
-    qsort(startAddresses, *nVariables+1, sizeof(uint16_t), compare16);
-
+    qsort(endAddresses, (*nVariables)+1, sizeof(uint8_t), compare8);
+    qsort(startAddresses, (*nVariables)+1, sizeof(uint16_t), compare16);
 
     int16_t address = MEMFULLERROR;
     uint8_t smallestSize = UINT8_MAX;
 
-
-    for(uint8_t i = 0; i < *nVariables+1; i++){
+    for(uint8_t i = 0; i < (*nVariables)+1; i++){
 
         uint8_t newSize = startAddresses[i] - endAddresses[i];
 
@@ -100,7 +97,6 @@ int16_t MemoryClass::freeSpace(const uint8_t size){
         }
     }
 
-    
     return address;
 }
 
@@ -123,12 +119,15 @@ int16_t MemoryClass::set(const char name, const uint8_t id){
             stack(id).popByte(), 
             0
         });
-        (*nVariables)++;
         
         int16_t address = 0;
-        if(var->type != STRING) address = freeSpace(var->type); // set later for string
+        if(var->type != STRING) {
+            address = freeSpace(var->type); // set later for string
+            if(address == MEMFULLERROR) return MEMFULLERROR;
+    
+            (*nVariables)++;
+        }
 
-        if(address == MEMFULLERROR) return MEMFULLERROR;
         var->address = (uint8_t) address;
     }
 
@@ -147,8 +146,11 @@ int16_t MemoryClass::set(const char name, const uint8_t id){
             memory[var->address] = 0; // set size to 0 to free current space
             
             int16_t address = freeSpace(size + 1); // +1 to store size 
-            if(address == MEMFULLERROR) return MEMFULLERROR; 
+            if(address == MEMFULLERROR) return MEMFULLERROR;
+
+            (*nVariables)++; 
             var->address = (uint8_t) address;
+            memory[var->address] = size;
         }
         
 
@@ -179,7 +181,6 @@ int16_t MemoryClass::get(const char name, const uint8_t id){
     if(var == nullptr) return NOTFOUND;
 
 
-
     if(var->type == STRING){
 
         uint8_t size = memory[var->address];
@@ -198,14 +199,12 @@ int16_t MemoryClass::get(const char name, const uint8_t id){
 
     else{
 
-        for(uint8_t i = var->address + var->type - 1; i >= var->address; i--){
+        for(int16_t i = var->address + var->type - 1; i >= var->address; i--){
 
             if(stack(id).pushByte(memory[i]) == STACKFULLERROR) return STACKFULLERROR;
-
         }
 
         if(stack(id).pushByte(var->type) == STACKFULLERROR) return STACKFULLERROR;
-        
     }
 
     return 1;

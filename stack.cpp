@@ -169,6 +169,16 @@ char* StackClass::popString(char* s){
     return s;
 }
 
+int16_t StackClass::popExact(){
+    switch (peekByte()){
+    case CHAR:
+        return popChar();
+
+    case INT:
+        return popInt();
+    }
+}
+
 float StackClass::popVal(){
 
     switch (peekByte()){
